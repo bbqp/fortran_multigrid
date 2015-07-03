@@ -3,14 +3,13 @@ module quad_tree_mesh
 	implicit none
 	
 	type, private :: qtree_node
-		real(R64) :: x = 0.0
-		real(R64) :: y = 0.0
+		real(R64) :: bon
 		integer :: num_children = 0
 		
-		type(qtree_node), pointer :: child1
-		type(qtree_node), pointer :: child2
-		type(qtree_node), pointer :: child3
-		type(qtree_node), pointer :: child4
+		type(qtree_node), pointer :: north
+		type(qtree_node), pointer :: south
+		type(qtree_node), pointer :: east
+		type(qtree_node), pointer :: west
 	end type qtree_node
 
 	type :: qtree_mesh
@@ -23,12 +22,6 @@ module quad_tree_mesh
 		procedure :: get => qtree_get_point
 		procedure :: clear => qtree_clear
 	end type qtree_mesh
-
-	interface
-		module procedure qtree_add_point
-		module procedure qtree_get_point
-		module procedure qtree_clear
-	end interface
 	
 	contains
 	
