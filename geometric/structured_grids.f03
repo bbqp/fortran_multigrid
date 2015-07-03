@@ -3,7 +3,7 @@
 ! Module that contains user-defined types and subroutines
 ! for 2D, 3D, and unstructured grids.
 
-module grid_types
+module structured_grids
 	use precision_specs
 	implicit none
 	
@@ -239,7 +239,7 @@ module grid_types
 			grid%hz = (grid%zn - grid%z0) / (grid%nz - 1)
 		end subroutine update_grid3d_info
 		
-end module grids
+end module structured_grids
 
 
 
