@@ -2,8 +2,9 @@ module quad_tree_mesh
 	use precision_specs
 	implicit none
 	
-	type, private :: qtree_node
-		real(R64) :: bon
+	type :: qtree_node
+		real(dp), dimension(1:2, 1:2) :: bounds
+		real(dp) :: 
 		integer :: num_children = 0
 		
 		type(qtree_node), pointer :: north
@@ -13,26 +14,28 @@ module quad_tree_mesh
 	end type qtree_node
 
 	type :: qtree_mesh
-		type(qtree_node), private :: root
+		type(qtree_node) :: root
 		integer :: tree_size = 0
-		
-		contains
-		
-		procedure :: add => qtree_add_point
-		procedure :: get => qtree_get_point
-		procedure :: clear => qtree_clear
 	end type qtree_mesh
 	
 	contains
 	
-	subroutine qtree_add_point(qtree, xcoord, ycoord)
+	subroutine qtree_refine_global(qtree, xcoord, ycoord)
 		type(qtree_mesh), intent(inout) :: qtree
-		real(R64), intent(in) :: xcoord
-		real(R64), intent(in) :: ycoord
+		real(dp), intent(in) :: xcoord
+		real(dp), intent(in) :: ycoord
 		
 		
-	end subroutine qtree_add_point
-
+	end subroutine qtree_refine_global
+	
+	subroutine qtree_refine_local(qtree, xcoord, ycoord)
+		type(qtree_mesh), intent(inout) :: qtree
+		real(dp), intent(in) :: xcoord
+		real(dp), intent(in) :: ycoord
+		
+		
+	end subroutine qtree_refine_local
+	
 end module
 
 
