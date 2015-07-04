@@ -7,16 +7,10 @@ module structured_grids
 	use precision_specs
 	implicit none
 	
-	! Parameters for identifying node types.
-	integer, parameter :: FREE_NODE = 0			! Also refers to an interior node for which we are solving.
-	integer, parameter :: DIRICHLET_NODE = 1	! A node with a fixed value on the boundary.
-	integer, parameter :: NEUMANN_NODE = 2		! A node corresponding to flux on the boundary.
-	integer, parameter :: ROBIN_NODE = 3		! A node whose value is a combination of the previous two.
-	
 	! Parameters for identifying boundary types.
 	integer, parameter :: DIRICHLET = 0
-	integer, parameter :: NEUMANN = 0
-	integer, parameter :: ROBIN = 0
+	integer, parameter :: NEUMANN = 1
+	integer, parameter :: ROBIN = 2
 	
 	contains
 		
@@ -24,31 +18,32 @@ module structured_grids
 		! Type definition and subroutines for 2D rectangular grids. !
 		!-----------------------------------------------------------!
 		
-		type :: Grid2D
+		type :: grid2d
 			! Coordinates of the bounding domain.
 			real(R64) :: x0, xn, y0, yn
 			
 			! The initial number of points in each direction.
-			integer :: nx0, ny0
+			integer :: numx0, numy0
 			
 			! The number of points at the current grid level.
-			integer :: nx, ny
+			integer :: numx, numy
 			
 			! The current step size on the given grid.
 			integer :: hx, hy
 			
-			! The current (kth) grid and the total number of grids m.
-			integer :: k, m
+			! The current grid level and the total number of grids.
+			integer :: current_grid_level
+			integer :: num_grids
 			
 			! Array for the boundary types.
-			integer, dimension(1:4) :: boundary_flags = DIRICHLET_NODE
-			integer, dimension(:,:), allocatable :: node_flags
-		end type Grid2D
+			integer, dimension(1:4) :: boundary_flags
+		end type grid2d
 		
-		subroutine init_grid2d(grid, x0, xn, y0, yn, nx0, ny0, num_grids)
-			type(Grid2D), intent(inout) :: grid
+		subroutine grid2d_init(grid, x0, xn, y0, yn, nx0, ny0, ngrids, bflags)
+			type(grid2d), intent(inout) :: grid
 			real(R64), intent(in) :: x0, xn, y0, yn
-			integer, intent(in) :: nx0, ny0, num_grids
+			integer, intent(in) :: nx0, ny0, ngrids
+			integer, dimension(1:4), intent(in) :: bflags
 			
 			! Integers for looping over and initializing grid indices.
 			integer :: i, j
@@ -60,32 +55,23 @@ module structured_grids
 			grid%yn = yn
 			
 			! Set the initial number of points in each direction.
-			grid%nx0 = nx0
-			grid%ny0 = ny0
+			grid%numx0 = nx0
+			grid%numy0 = ny0
 			
 			! Set the current grid number to the maximum
 			! number of grids, and the number of x- and y-
 			! points accordingly.
-			grid%k = num_grids
-			grid%m = num_grids
-			grid%nx = 2**(grid%m - 1) * (grid%nx0 - 1) + 1
-			grid%ny = 2**(grid%m - 1) * (grid%ny0 - 1) + 1
+			grid%current_grid_level = ngrids - 1
+			grid%num_grids = ngrids
+			grid%numx = 2**(ngrids - 1) * (nx0 - 1) + 1
+			grid%numy = 2**(ngrids - 1) * (ny0 - 1) + 1
 			
 			! Now set the step sizes.
-			grid%hx = (grid%xn - grid%x0) / (grid%nx - 1)
-			grid%hy = (grid%xn - grid%x0) / (grid%ny - 1)
-			
-			! Allocate the node flags.
-			allocate(grid%node_flags(1:grid%nx,1:grid%ny))
-			
-			! Set the nodes to free nodes initially.
-			grid%node_flags = FREE_NODE
+			grid%hx = (grid%xn - grid%x0) / (grid%numx - 1)
+			grid%hy = (grid%yn - grid%y0) / (grid%numy - 1)
 			
 			! Set the boundary nodes to dirichlet by default.
-			grid%node_flags(:, 1) = DIRICHLET_NODE
-			grid%node_flags(:, grid%ny) = DIRICHLET_NODE
-			grid%node_flags(1, :) = DIRICHLET_NODE
-			grid%node_flags(grid%nx, :) = DIRICHLET_NODE
+			grid%boundary_flags = bflags
 		end subroutine init_grid2d
 		
 		subroutine set_boundary_types_2d(grid, node_types, houndary_num)
@@ -114,8 +100,20 @@ module structured_grids
 			
 		end subroutine set_boundary_types_2d
 		
-		subroutine update_grid2d_info(grid, k)
-			type(Grid2D), intent(inout) :: grid
+		subroutine grid2d_refine(grid)
+			type(grid2d), intent(inout) :: grid
+			
+			grid2d_jump_to_level(grid, grid%current_level + 1)
+		end subroutine grid2d_refine
+		
+		subroutine grid2d_coarsen(grid)
+			type(grid2d), intent(inout) :: grid
+			
+			grid2d_jump_to_level(grid, grid%current_level - 1)
+		end subroutine grid2d_coarsen
+		
+		subroutine grid2d_jump_to_level(grid, k)
+			type(grid2d), intent(inout) :: grid
 			integer, intent(in) :: k
 			
 			! Integers for looping over and initializing grid indices.
@@ -123,37 +121,18 @@ module structured_grids
 			
 			! We need to have a valid grid number;
 			! otherwise, we do nothing and exit.
-			if(k .lt. 1 .or. k .gt. grid%m) then
-				print *, 'Invalid grid number.'
+			if(0 <= k .and. k < grid%num_grids - 1) then
+				! Set the current grid level.
+				grid%current_level = k
 				
-				return;
+				! Set the number of x- and y-points.
+				grid%numx = 2**k * (grid%numx0 - 1) + 1
+				grid%numy = 2**k * (grid%numy0 - 1) + 1
+				
+				! Now set the step sizes.
+				grid%hx = (grid%xn - grid%x0) / (grid%numx - 1)
+				grid%hy = (grid%yn - grid%y0) / (grid%numy - 1)
 			endif
-			
-			! Set the current grid level.
-			grid%k = k
-			
-			! Set the number of x- and y-points.
-			grid%nx = 2**(grid%k - 1) * (grid%nx0 - 1) + 1
-			grid%ny = 2**(grid%k - 1) * (grid%ny0 - 1) + 1
-			
-			! Now set the step sizes.
-			grid%hx = (grid%xn - grid%x0) / (grid%nx - 1)
-			grid%hy = (grid%xn - grid%x0) / (grid%ny - 1)
-			
-			! Reallocate and set the grid indices for each boundary.
-			if(allocated(grid%boundary_indices)) then
-				deallocate(grid%boundary_indices)
-			end if
-			
-			do i = 1, 4
-				if(i .eq. 1 .or. i .eq. 3) then
-					allocate(grid%boundary_indices(i, 1:grid%ny))
-					grid%boundary_indices(i, :) = (/ j, j = 1, grid%ny /)
-				else
-					allocate(grid%boundary_indices(i, 1:grid%nx))
-					grid%boundary_indices(i, :) = (/ j, j = 1, grid%nx /)
-				end if
-			end do
 		end subroutine update_grid2d_info
 		
 		!-----------------------------------------------------------!
