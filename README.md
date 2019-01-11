@@ -1,5 +1,5 @@
-multigrid
-=========
+fortran_multigrid
+=================
 
 Repo for geometric (and later) algebraic multigrid methods for solving partial differential equations.
 
